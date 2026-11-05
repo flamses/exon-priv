@@ -1,3 +1,3 @@
 # Roblox owner user IDs, one per line.
-# Add IDs here, commit the file, and let Render redeploy.
+# Add IDs here, commit the file, and deploy the latest commit in Render.
 9140430988 # FlamesT_T

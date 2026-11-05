@@ -9,7 +9,9 @@ script is running. The script announces this in the executor console and provide
 ## Owner whitelist
 
 Edit `owners.txt`, one Roblox numeric user ID per line. Comments after # are fine.
-Commit your changes to main; Render redeploys the file automatically.
+Commit your changes to main, then open the Render service and choose
+Manual Deploy > Deploy latest commit. This service uses a public repository URL,
+so automatic deploys require connecting the GitHub account in Render first.
 FlamesT_T (9140430988) is already listed.
 
 Owners use the private configured script provided separately. Keep it private:

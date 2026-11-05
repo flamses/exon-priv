@@ -1,7 +1,9 @@
-"""Single-process relay. Run behind an HTTPS reverse proxy."""
-import hashlib
+"""Automatic free-client enrollment with separately authenticated owners."""
 from contextlib import contextmanager
+from pathlib import Path
+import hashlib
 import hmac
+import json
 import math
 import os
 import secrets
@@ -15,6 +17,7 @@ OWNER_KEY = os.environ.get('OWNER_KEY', '')
 if len(OWNER_KEY) < 32:
     raise RuntimeError('Set OWNER_KEY to a random secret of at least 32 characters')
 DB = os.environ.get('DATABASE_PATH', 'relay.sqlite3')
+OWNERS_FILE = Path(os.environ.get('OWNERS_FILE', str(Path(__file__).with_name('owners.txt'))))
 
 @contextmanager
 def connect():
@@ -28,16 +31,22 @@ def connect():
 
 with connect() as db:
     db.executescript('''
-    CREATE TABLE IF NOT EXISTS clients (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT NOT NULL,
-      seen REAL DEFAULT 0, job TEXT DEFAULT '');
-    CREATE TABLE IF NOT EXISTS commands (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, client TEXT NOT NULL,
-      body TEXT NOT NULL, expires REAL NOT NULL, ack INTEGER DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid TEXT PRIMARY KEY, uid TEXT NOT NULL, name TEXT NOT NULL,
+      token_hash TEXT UNIQUE NOT NULL, seen REAL NOT NULL, job TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS sessions_target ON sessions(uid,job,seen);
+    CREATE TABLE IF NOT EXISTS inbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, sid TEXT NOT NULL,
+      body TEXT NOT NULL, expires REAL NOT NULL);
     ''')
 
-def digest(value):
-    return hashlib.sha256(value.encode()).hexdigest()
+def owners():
+    try:
+        lines = OWNERS_FILE.read_text().splitlines()
+        return {line.split('#', 1)[0].strip() for line in lines
+                if line.split('#', 1)[0].strip().isdigit()}
+    except OSError:
+        return set() # Missing file must never open owner access.
 
 def bearer():
     value = request.headers.get('Authorization', '')
@@ -48,100 +57,122 @@ def bearer():
 def owner():
     if not hmac.compare_digest(bearer(), OWNER_KEY):
         abort(403)
+    if request.headers.get('X-Owner-Id', '') not in owners():
+        abort(403)
 
 def client(db):
-    row = db.execute('SELECT * FROM clients WHERE token_hash=?', (digest(bearer()),)).fetchone()
+    token_hash = hashlib.sha256(bearer().encode()).hexdigest()
+    row = db.execute('SELECT * FROM sessions WHERE token_hash=?', (token_hash,)).fetchone()
     if row is None:
         abort(403)
     return row
 
+def data():
+    value = request.get_json()
+    if not isinstance(value, dict):
+        abort(400)
+    return value
+
+def cleanup(db):
+    now = time.time()
+    db.execute('DELETE FROM inbox WHERE expires<?', (now,))
+    db.execute('DELETE FROM sessions WHERE seen<?', (now-120,))
+    db.execute('DELETE FROM inbox WHERE sid NOT IN (SELECT sid FROM sessions)')
+
 @app.get('/health')
 def health():
+    with connect() as db:
+        db.execute('SELECT 1').fetchone()
     return jsonify(ok=True)
 
-@app.route('/clients', methods=['GET', 'POST'])
+@app.post('/role')
+def role():
+    return jsonify(owner=str(data().get('id', '')) in owners())
+
+@app.post('/join')
+def join():
+    d = data()
+    uid, name, job = str(d.get('id', '')), d.get('name'), d.get('job')
+    if not uid.isdigit() or len(uid)>20 or not isinstance(name,str) or not 1<=len(name)<=32 or not isinstance(job,str) or not 1<=len(job)<=128:
+        abort(400)
+    token, sid = secrets.token_urlsafe(32), secrets.token_urlsafe(18)
+    with connect() as db:
+        cleanup(db)
+        # Bounded public registration; each client has a separate inbox. A new
+        # registration never takes over somebody else's existing connection.
+        if db.execute('SELECT count(*) FROM sessions').fetchone()[0] >= 2000:
+            abort(429)
+        db.execute('INSERT INTO sessions VALUES(?,?,?,?,?,?)',
+                   (sid,uid,name,hashlib.sha256(token.encode()).hexdigest(),time.time(),job))
+    return jsonify(token=token)
+
+@app.get('/clients')
 def clients():
     owner()
     with connect() as db:
-        if request.method == 'GET':
-            return jsonify(clients=[dict(r) for r in db.execute('SELECT id,name,seen,job FROM clients')])
-        data = request.get_json()
-        uid, name = str(data.get('id', '')), str(data.get('name', ''))
-        if not uid.isdigit() or len(uid) > 20 or not 1 <= len(name) <= 32:
-            abort(400)
-        token = secrets.token_urlsafe(32)
-        db.execute('INSERT INTO clients(id,name,token_hash) VALUES(?,?,?) '
-                   'ON CONFLICT(id) DO UPDATE SET name=excluded.name,token_hash=excluded.token_hash,seen=0,job=\'\'',
-                   (uid, name, digest(token)))
-        db.execute('DELETE FROM commands WHERE client=?', (uid,))
-    return jsonify(id=uid, token=token)
+        cleanup(db)
+        rows=db.execute('SELECT sid,id,name,seen,job FROM (SELECT sid,uid AS id,name,seen,job FROM sessions) WHERE seen>?', (time.time()-15,)).fetchall()
+    return jsonify(clients=[dict(r) for r in rows])
 
-@app.delete('/clients/<uid>')
-def revoke(uid):
+@app.delete('/clients/<sid>')
+def revoke(sid):
     owner()
     with connect() as db:
-        db.execute('DELETE FROM clients WHERE id=?', (uid,))
-        db.execute('DELETE FROM commands WHERE client=?', (uid,))
+        db.execute('DELETE FROM sessions WHERE sid=?', (sid,))
+        db.execute('DELETE FROM inbox WHERE sid=?', (sid,))
     return jsonify(ok=True)
 
 @app.post('/poll')
 def poll():
-    data = request.get_json()
     with connect() as db:
         c = client(db)
-        job = str(data.get('job', ''))[:128]
-        if str(data.get('id')) != c['id'] or not job:
-            abort(403)
-        # Drop commands from an old server session.
-        if c['job'] != job:
-            db.execute('DELETE FROM commands WHERE client=?', (c['id'],))
-        db.execute('UPDATE clients SET seen=?,job=? WHERE id=?', (time.time(), job, c['id']))
-        db.execute('DELETE FROM commands WHERE expires<?', (time.time(),))
-        rows = db.execute('SELECT id,body FROM commands WHERE client=? AND ack=0 ORDER BY id LIMIT 20', (c['id'],)).fetchall()
-    import json
-    return jsonify(commands=[dict(id=r['id'], **json.loads(r['body'])) for r in rows])
+        db.execute('UPDATE sessions SET seen=? WHERE sid=?', (time.time(),c['sid']))
+        cleanup(db)
+        rows=db.execute('SELECT id,body FROM inbox WHERE sid=? ORDER BY id LIMIT 20', (c['sid'],)).fetchall()
+    return jsonify(commands=[dict(id=r['id'],**json.loads(r['body'])) for r in rows])
 
 @app.post('/ack')
 def ack():
-    data = request.get_json()
-    ids = data.get('ids', [])
-    if not isinstance(ids, list) or len(ids) > 20 or any(type(i) is not int for i in ids):
+    ids=data().get('ids', [])
+    if not isinstance(ids,list) or len(ids)>20 or any(type(i) is not int for i in ids):
         abort(400)
     with connect() as db:
-        c = client(db)
-        db.executemany('DELETE FROM commands WHERE id=? AND client=?', [(i, c['id']) for i in ids])
+        c=client(db)
+        db.executemany('DELETE FROM inbox WHERE id=? AND sid=?',[(i,c['sid']) for i in ids])
     return jsonify(ok=True)
 
 @app.post('/command')
 def command():
     owner()
-    data = request.get_json()
-    uid, name = str(data.get('target', '')), data.get('command')
-    allowed = {'bring', 'kill', 'fling', 'kick', 'freeze', 'unfreeze', 'walkspeed', 'jumppower'}
-    if name not in allowed:
+    d=data()
+    uid,name=str(d.get('target','')),d.get('command')
+    allowed={'bring','kill','fling','kick','freeze','unfreeze','walkspeed','jumppower'}
+    if not isinstance(name,str) or name not in allowed:
         abort(400)
-    payload = {'command': name}
-    if name in {'walkspeed', 'jumppower'}:
-        value = data.get('value')
-        if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 200:
+    if uid in owners():
+        return jsonify(error='Owners cannot be targeted'),403
+    payload={'command':name}
+    if name in {'walkspeed','jumppower'}:
+        v=d.get('value')
+        if type(v) not in (int,float) or not math.isfinite(v) or not 0<=v<=200:
             abort(400)
-        payload['value'] = value
-    if name == 'bring':
-        pos = data.get('position')
-        if not isinstance(pos, list) or len(pos) != 3 or any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1000000 for v in pos):
+        payload['value']=v
+    if name=='bring':
+        p=d.get('position')
+        if not isinstance(p,list) or len(p)!=3 or any(type(v) not in (int,float) or not math.isfinite(v) or abs(v)>1000000 for v in p):
             abort(400)
-        payload['position'] = pos
-    import json
+        payload['position']=p
     with connect() as db:
-        c = db.execute('SELECT * FROM clients WHERE id=?', (uid,)).fetchone()
-        if not c or c['seen'] < time.time() - 15:
-            return jsonify(error='Target is offline'), 409
-        if not data.get('job') or data['job'] != c['job']:
-            return jsonify(error='Target is in a different Roblox server'), 409
-        count = db.execute('SELECT count(*) FROM commands WHERE client=? AND expires>?', (uid, time.time())).fetchone()[0]
-        if count >= 20:
-            abort(429)
-        db.execute('INSERT INTO commands(client,body,expires) VALUES(?,?,?)', (uid, json.dumps(payload), time.time()+10))
+        cleanup(db)
+        targets=db.execute('SELECT sid FROM sessions WHERE uid=? AND job=? AND seen>?', (uid,d.get('job',''),time.time()-15)).fetchall()
+        if not targets:
+            return jsonify(error='Target is offline or in a different server'),409
+        for target in targets:
+            count=db.execute('SELECT count(*) FROM inbox WHERE sid=?',(target['sid'],)).fetchone()[0]
+            if count>=20:
+                abort(429)
+        for target in targets:
+            db.execute('INSERT INTO inbox(sid,body,expires) VALUES(?,?,?)', (target['sid'],json.dumps(payload),time.time()+10))
     return jsonify(queued=True)
 
 @app.errorhandler(400)
@@ -150,4 +181,4 @@ def command():
 @app.errorhandler(413)
 @app.errorhandler(429)
 def error(err):
-    return jsonify(error=err.name), err.code
+    return jsonify(error=err.name),err.code

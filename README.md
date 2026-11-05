@@ -1,57 +1,31 @@
-# Owner / free-user Luau relay
+# Exon private / free relay
 
-Status: backend and client files built; backend checks tested locally. NOT hosted,
-NOT tested in Roblox or any executor. Requires an executor exposing request,
-http_request, or syn.request. Chat delivery differs between executors; a console
-command function is provided. No Studio server scripts are needed.
+Public script: `client.luau`. Anyone can run it without entering a key or being
+registered manually. It registers a temporary session automatically and reconnects
+if hosting storage is reset. Free users receive the owner's commands while the
+script is running. The script announces this in the executor console and provides
+`getgenv().OwnerRelay.stop()` to disconnect.
 
-## Start the backend
+## Owner whitelist
 
-Use Python 3.11+ in this folder:
+Edit `owners.txt`, one Roblox numeric user ID per line. Comments after # are fine.
+Commit your changes to main; Render redeploys the file automatically.
+FlamesT_T (9140430988) is already listed.
 
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    export OWNER_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-    gunicorn --workers 1 --threads 4 --bind 0.0.0.0:8000 relay:app
+Owners use the private configured script provided separately. Keep it private:
+it contains OWNER_KEY. To prepare a copy yourself, copy client.luau and set its
+OWNER_KEY to your Render secret. No key is entered by free users. The script
+selects owner mode when its Roblox ID is whitelisted AND its copy has the private
+credential. Both conditions are checked for owner API calls. A whitelisted user
+running the public script must switch to their private copy for commands.
+Removing a user ID from owners.txt removes that ID's owner authorization after
+deployment. Whitelisted IDs cannot be targeted by the relay.
 
-Store the generated OWNER_KEY in a private password manager before closing this
-terminal. Retrieve it locally from your environment; do not send it in chat or
-commit it. Never give it to free users. The server refuses short/missing keys.
-On a host, configure OWNER_KEY as a secret environment variable and use:
-
-    gunicorn --workers 1 --threads 4 --bind 0.0.0.0:$PORT relay:app
-
-Use a public HTTPS address for remote clients. Localhost only reaches the same
-computer. A live URL requires hosting; nothing in this folder creates one.
-Keep DATABASE_PATH on a persistent disk for durable enrollments. The default
-SQLite file is relative to the working directory; ephemeral hosts may erase it.
-Run one instance; this SQLite design is intended for a small deployment.
-
-## Enroll a free user
-
-From another terminal in this folder:
-
-    python3 manage.py https://YOUR-RELAY-HOST add --id 123456 --name TheirUsername
-
-The helper privately prompts for the owner key and prints a new client token.
-Give ONLY that token to that free user. Re-adding their ID rotates their token.
-
-    python3 manage.py https://YOUR-RELAY-HOST list
-    python3 manage.py https://YOUR-RELAY-HOST revoke --id 123456
-
-## Configure the same client file for each role
-
-In client.luau set URL to the public HTTPS address.
-
-Your private copy: ROLE = "owner", KEY = your OWNER_KEY.
-Their copy: ROLE = "free", KEY = their individual client token.
-
-Keep the owner copy private. Selecting ROLE="owner" without the owner key does
-not grant access. Client keys can only poll/ack their own assigned inbox.
-Token-to-user-ID binding prevents accidental use by another account in the
-unmodified client; it is NOT proof of Roblox identity. Modified clients can lie
-about their ID or JobId. Do not use this relay as a purchase/license verifier.
+An executor can falsify the user ID it sends over HTTP. A text whitelist alone
+cannot authenticate ownership. Anyone who obtains the shared owner credential
+can impersonate an allowed owner ID; do not distribute it with the public script.
+Use separate credentials per owner or Roblox OAuth if you need stronger identity
+verification for multiple mutually untrusted owners.
 
 ## Commands
 
@@ -66,40 +40,43 @@ about their ID or JobId. Do not use this relay as a purchase/license verifier.
     !jumppower username 100
     !stop
 
-Commands target one enrolled user in your current Roblox server. Username
-prefixes must be unambiguous; numeric user IDs also work. This version doesn't
-include all-player commands. The owner is a sender, not a receiving client.
-
-If your executor does not deliver LocalPlayer.Chatted, use its console:
+Targets must run the free script in your Roblox server. Numeric IDs and
+unambiguous username prefixes work. If executor chat events do not work:
 
     getgenv().OwnerRelay.command("bring username")
 
-A free user can stop participating:
+## Hosting
 
-    getgenv().OwnerRelay.stop()
+The deployment is https://exon-priv-relay.onrender.com with /health for readiness.
+Source: https://github.com/flamses/exon-priv
 
-Re-running the client stops the previous polling loop and chat listener.
+For another deployment, use Python 3.11+, install requirements.txt, configure
+OWNER_KEY as a secret random value of at least 32 characters, then start:
 
-## Behavior and limitations
+    gunicorn --workers 1 --threads 4 --bind 0.0.0.0:$PORT relay:app
 
-The target client performs the command on itself. Kick calls LocalPlayer:Kick;
-bring moves their character to the owner's transmitted position. Fling applies
-velocity to the target character, not other characters. Server checks can undo
-movement, health, speed, jump, or physics changes. No server authority is gained.
-Freeze/speed/jump changes aren't reapplied after respawn. Stop unanchors a root
-frozen by this script, but doesn't reset speed/jump or reverse completed actions.
+Configure the public HTTPS URL in client.luau. Optional DATABASE_PATH and
+OWNERS_FILE override local paths. The database stores short-lived sessions, not
+owner grants. The committed owners.txt survives deploys; free clients reconnect
+automatically after an ephemeral database reset. Free hosting may sleep when idle.
 
-Poll interval is approximately one second, with backoff on errors. Commands
-expire after ten seconds; offline targets are rejected. Queues are bounded,
-commands are retried until acknowledged/expired, and the running client remembers
-recent command IDs to suppress duplicates. Restarting the client before an ack
-can repeat a command. Acknowledged means attempted, not verified game success;
-there is no owner-facing execution receipt yet. Kick can disconnect before ack.
+## Limits
 
-Only the fixed command allowlist is supported; no remote Lua evaluation or
-arbitrary downloaded code. Run HTTPS through your hosting platform and add edge
-rate limits for a public deployment. SQLite enrollments survive process restarts
-when the disk is persistent. Credentials remain inspectable by anyone who has
-the client copy containing them.
+Requires executor request, http_request, or syn.request. Actual executor behavior
+has not been tested. The target client runs actions on itself; game servers can
+undo health, movement, speed, jump, or physics changes. This grants no server
+permissions. Fling changes the receiving player's velocity only. Character
+changes aren't automatically reapplied after respawn. Stop unfreezes a character
+frozen by this script; it does not restore previous speed or jump values.
 
-Reference: https://create.roblox.com/docs/reference/engine/classes/Player#Kick
+Commands expire in ten seconds and target sessions active within fifteen seconds.
+Polling is about once per second, with backoff during failures. Acknowledgment
+means attempted execution, not verified game success. Commands aren't arbitrary
+Lua: only the fixed command allowlist is accepted.
+
+Sessions have independent tokens generated automatically in memory. A duplicate
+registration cannot replace an existing inbox. IDs and server IDs claimed by free
+clients aren't verified Roblox identities. A modified client can create fake
+sessions. Public registration is bounded to 2000 recent sessions; add hosting-edge
+rate limits for wider distribution. Idle sessions expire after two minutes.
+Public registration is open: revoking a session is not a permanent ban.

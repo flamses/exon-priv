@@ -1,8 +1,8 @@
--- Same file for both roles. Keep the OWNER key ONLY in your private copy.
+-- Public copy: everyone connects as free with no setup or key entry.
+-- Keep OWNER_KEY empty in the public copy. Only private copies contain it.
 local CONFIG = {
-    URL = "https://YOUR-RELAY-HOST",
-    ROLE = "free", -- "owner" or "free"
-    KEY = "PASTE_THIS_USERS_KEY",
+    URL = "https://exon-priv-relay.onrender.com",
+    OWNER_KEY = "",
 }
 
 local Players = game:GetService("Players")
@@ -12,7 +12,6 @@ local env = (getgenv and getgenv()) or _G
 local httpRequest = request or http_request or (syn and syn.request)
 assert(httpRequest, "This executor needs an HTTP request API")
 assert(CONFIG.URL ~= "https://YOUR-RELAY-HOST", "Configure the relay URL first")
-assert(CONFIG.ROLE == "owner" or CONFIG.ROLE == "free", "Invalid role")
 local previous = env.OwnerRelay
 if previous and previous.stop then previous.stop() end
 local running, connection = true, nil
@@ -25,11 +24,13 @@ function state.stop()
 end
 env.OwnerRelay = state
 
+local sessionKey = ""
+local isOwner = false
 local function api(path, body, method)
     local response = httpRequest({
         Url = CONFIG.URL:gsub("/$", "") .. path,
         Method = method or "POST",
-        Headers = { ["Content-Type"] = "application/json", Authorization = "Bearer " .. CONFIG.KEY },
+        Headers = { ["Content-Type"] = "application/json", Authorization = "Bearer " .. (isOwner and CONFIG.OWNER_KEY or sessionKey), ["X-Owner-Id"] = tostring(me.UserId) },
         Body = body and Http:JSONEncode(body) or nil,
     })
     local code = response.StatusCode or response.Status
@@ -70,7 +71,18 @@ local function execute(item)
     end
 end
 
-if CONFIG.ROLE == "owner" then
+-- A public ID whitelist is an authorization rule, not proof of identity.
+-- Owner commands require BOTH the whitelist entry and the private credential.
+local allowed = api("/role", {id = tostring(me.UserId)}).owner
+isOwner = allowed and CONFIG.OWNER_KEY ~= ""
+if CONFIG.OWNER_KEY ~= "" and not allowed then
+    error("Your user ID is not listed in owners.txt")
+end
+local function join()
+    sessionKey = api("/join", {id = tostring(me.UserId), name = me.Name, job = game.JobId}).token
+end
+
+if isOwner then
     function state.command(text)
         local words = {}
         for word in text:gmatch("%S+") do table.insert(words, word) end
@@ -112,12 +124,14 @@ if CONFIG.ROLE == "owner" then
     end)
     print('Owner ready. Use !users or !bring username. Console fallback: getgenv().OwnerRelay.command("bring username")')
 else
+    if allowed then warn("You are whitelisted. Run your private owner copy to enable commands.") end
     local seen, order = {}, {}
     task.spawn(function()
         local backoff = 1
         while running do
             local ok, err = pcall(function()
-                local result = api("/poll", {id = tostring(me.UserId), job = game.JobId})
+                if sessionKey == "" then join() end
+                local result = api("/poll", {})
                 if not running then return end
                 local ack = {}
                 for _, item in ipairs(result.commands) do
@@ -135,6 +149,7 @@ else
             end)
             if ok then backoff = 1 else
                 warn("Relay:", err)
+                if tostring(err):find("HTTP 403", 1, true) then sessionKey = "" end
                 backoff = math.min(backoff * 2, 15)
             end
             task.wait(backoff)

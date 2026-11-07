@@ -1,0 +1,590 @@
+{
+  "bring": {
+    "kind": "action",
+    "description": "bring"
+  },
+  "kill": {
+    "kind": "action",
+    "description": "kill"
+  },
+  "heal": {
+    "kind": "action",
+    "description": "heal"
+  },
+  "reset": {
+    "kind": "action",
+    "description": "reset"
+  },
+  "freeze": {
+    "kind": "action",
+    "description": "freeze"
+  },
+  "unfreeze": {
+    "kind": "action",
+    "description": "unfreeze"
+  },
+  "sit": {
+    "kind": "action",
+    "description": "sit"
+  },
+  "unsit": {
+    "kind": "action",
+    "description": "unsit"
+  },
+  "jump": {
+    "kind": "action",
+    "description": "jump"
+  },
+  "platformstand": {
+    "kind": "action",
+    "description": "platformstand"
+  },
+  "unplatformstand": {
+    "kind": "action",
+    "description": "unplatformstand"
+  },
+  "autorotate": {
+    "kind": "action",
+    "description": "autorotate"
+  },
+  "noautorotate": {
+    "kind": "action",
+    "description": "noautorotate"
+  },
+  "ragdoll": {
+    "kind": "action",
+    "description": "ragdoll"
+  },
+  "unragdoll": {
+    "kind": "action",
+    "description": "unragdoll"
+  },
+  "stun": {
+    "kind": "action",
+    "description": "stun"
+  },
+  "unstun": {
+    "kind": "action",
+    "description": "unstun"
+  },
+  "stopvelocity": {
+    "kind": "action",
+    "description": "stopvelocity"
+  },
+  "stopwalk": {
+    "kind": "action",
+    "description": "stopwalk"
+  },
+  "unfollow": {
+    "kind": "action",
+    "description": "unfollow"
+  },
+  "unorbit": {
+    "kind": "action",
+    "description": "unorbit"
+  },
+  "unfloat": {
+    "kind": "action",
+    "description": "unfloat"
+  },
+  "noclip": {
+    "kind": "action",
+    "description": "noclip"
+  },
+  "clip": {
+    "kind": "action",
+    "description": "clip"
+  },
+  "bunnyhop": {
+    "kind": "action",
+    "description": "bunnyhop"
+  },
+  "unbunnyhop": {
+    "kind": "action",
+    "description": "unbunnyhop"
+  },
+  "autowalk": {
+    "kind": "action",
+    "description": "autowalk"
+  },
+  "unautowalk": {
+    "kind": "action",
+    "description": "unautowalk"
+  },
+  "sprint": {
+    "kind": "action",
+    "description": "sprint"
+  },
+  "unsprint": {
+    "kind": "action",
+    "description": "unsprint"
+  },
+  "crouch": {
+    "kind": "action",
+    "description": "crouch"
+  },
+  "uncrouch": {
+    "kind": "action",
+    "description": "uncrouch"
+  },
+  "resetstats": {
+    "kind": "action",
+    "description": "resetstats"
+  },
+  "walkspeed": {
+    "kind": "action",
+    "description": "walkspeed",
+    "arg": "number",
+    "default": 50,
+    "min": 0,
+    "max": 200
+  },
+  "jumppower": {
+    "kind": "action",
+    "description": "jumppower",
+    "arg": "number",
+    "default": 100,
+    "min": 0,
+    "max": 200
+  },
+  "jumpheight": {
+    "kind": "action",
+    "description": "jumpheight",
+    "arg": "number",
+    "default": 14,
+    "min": 0,
+    "max": 100
+  },
+  "hipheight": {
+    "kind": "action",
+    "description": "hipheight",
+    "arg": "number",
+    "default": 3,
+    "min": -3,
+    "max": 20
+  },
+  "spin": {
+    "kind": "action",
+    "description": "spin",
+    "arg": "number",
+    "default": 10,
+    "min": -50,
+    "max": 50
+  },
+  "forward": {
+    "kind": "action",
+    "description": "forward",
+    "arg": "number",
+    "default": 10,
+    "min": 0,
+    "max": 200
+  },
+  "backward": {
+    "kind": "action",
+    "description": "backward",
+    "arg": "number",
+    "default": 10,
+    "min": 0,
+    "max": 200
+  },
+  "left": {
+    "kind": "action",
+    "description": "left",
+    "arg": "number",
+    "default": 10,
+    "min": 0,
+    "max": 200
+  },
+  "right": {
+    "kind": "action",
+    "description": "right",
+    "arg": "number",
+    "default": 10,
+    "min": 0,
+    "max": 200
+  },
+  "up": {
+    "kind": "action",
+    "description": "up",
+    "arg": "number",
+    "default": 10,
+    "min": 0,
+    "max": 500
+  },
+  "down": {
+    "kind": "action",
+    "description": "down",
+    "arg": "number",
+    "default": 10,
+    "min": 0,
+    "max": 500
+  },
+  "turn": {
+    "kind": "action",
+    "description": "turn",
+    "arg": "number",
+    "default": 90,
+    "min": -360,
+    "max": 360
+  },
+  "launch": {
+    "kind": "action",
+    "description": "launch",
+    "arg": "number",
+    "default": 100,
+    "min": 0,
+    "max": 250
+  },
+  "drop": {
+    "kind": "action",
+    "description": "drop",
+    "arg": "number",
+    "default": 100,
+    "min": 0,
+    "max": 250
+  },
+  "boost": {
+    "kind": "action",
+    "description": "boost",
+    "arg": "number",
+    "default": 70,
+    "min": 0,
+    "max": 200
+  },
+  "float": {
+    "kind": "action",
+    "description": "float",
+    "arg": "number",
+    "default": 5,
+    "min": 0,
+    "max": 100
+  },
+  "orbit": {
+    "kind": "action",
+    "description": "orbit",
+    "arg": "number",
+    "default": 8,
+    "min": 2,
+    "max": 40
+  },
+  "follow": {
+    "kind": "action",
+    "description": "follow",
+    "arg": "number",
+    "default": 4,
+    "min": 2,
+    "max": 30
+  },
+  "unspin": {
+    "kind": "action",
+    "description": "unspin"
+  },
+  "turnleft": {
+    "kind": "action",
+    "description": "turnleft"
+  },
+  "turnright": {
+    "kind": "action",
+    "description": "turnright"
+  },
+  "turnaround": {
+    "kind": "action",
+    "description": "turnaround"
+  },
+  "faceforward": {
+    "kind": "action",
+    "description": "faceforward"
+  },
+  "facebackward": {
+    "kind": "action",
+    "description": "facebackward"
+  },
+  "faceleft": {
+    "kind": "action",
+    "description": "faceleft"
+  },
+  "faceright": {
+    "kind": "action",
+    "description": "faceright"
+  },
+  "tpcoords": {
+    "kind": "action",
+    "description": "tpcoords",
+    "arg": "vector",
+    "default": null,
+    "min": -1000000,
+    "max": 1000000
+  },
+  "velocity": {
+    "kind": "action",
+    "description": "velocity",
+    "arg": "vector",
+    "default": null,
+    "min": -1000000,
+    "max": 1000000
+  },
+  "walkto": {
+    "kind": "action",
+    "description": "walkto",
+    "arg": "vector",
+    "default": null,
+    "min": -1000000,
+    "max": 1000000
+  },
+  "wave": {
+    "kind": "action",
+    "description": "wave"
+  },
+  "point": {
+    "kind": "action",
+    "description": "point"
+  },
+  "cheer": {
+    "kind": "action",
+    "description": "cheer"
+  },
+  "laugh": {
+    "kind": "action",
+    "description": "laugh"
+  },
+  "dance": {
+    "kind": "action",
+    "description": "dance"
+  },
+  "dance2": {
+    "kind": "action",
+    "description": "dance2"
+  },
+  "dance3": {
+    "kind": "action",
+    "description": "dance3"
+  },
+  "equip": {
+    "kind": "action",
+    "description": "equip"
+  },
+  "unequip": {
+    "kind": "action",
+    "description": "unequip"
+  },
+  "equipall": {
+    "kind": "action",
+    "description": "equipall"
+  },
+  "activate": {
+    "kind": "action",
+    "description": "activate"
+  },
+  "deactivate": {
+    "kind": "action",
+    "description": "deactivate"
+  },
+  "droptools": {
+    "kind": "action",
+    "description": "droptools"
+  },
+  "rejoin": {
+    "kind": "action",
+    "description": "rejoin"
+  },
+  "serverhop": {
+    "kind": "action",
+    "description": "serverhop"
+  },
+  "hoplow": {
+    "kind": "action",
+    "description": "hoplow"
+  },
+  "hophigh": {
+    "kind": "action",
+    "description": "hophigh"
+  },
+  "joinplace": {
+    "kind": "action",
+    "description": "joinplace",
+    "arg": "number",
+    "default": null,
+    "min": 1,
+    "max": 10000000000000000
+  },
+  "kick": {
+    "kind": "action",
+    "description": "kick",
+    "arg": "text",
+    "default": null,
+    "min": null,
+    "max": null
+  },
+  "help": {
+    "kind": "info",
+    "description": "help"
+  },
+  "users": {
+    "kind": "info",
+    "description": "users"
+  },
+  "players": {
+    "kind": "info",
+    "description": "players"
+  },
+  "whoami": {
+    "kind": "info",
+    "description": "whoami"
+  },
+  "ping": {
+    "kind": "info",
+    "description": "ping"
+  },
+  "relaystatus": {
+    "kind": "info",
+    "description": "relaystatus"
+  },
+  "status": {
+    "kind": "info",
+    "description": "status"
+  },
+  "serverinfo": {
+    "kind": "info",
+    "description": "serverinfo"
+  },
+  "gameinfo": {
+    "kind": "info",
+    "description": "gameinfo"
+  },
+  "placeid": {
+    "kind": "info",
+    "description": "placeid"
+  },
+  "jobid": {
+    "kind": "info",
+    "description": "jobid"
+  },
+  "universeid": {
+    "kind": "info",
+    "description": "universeid"
+  },
+  "playercount": {
+    "kind": "info",
+    "description": "playercount"
+  },
+  "ownerids": {
+    "kind": "info",
+    "description": "ownerids"
+  },
+  "version": {
+    "kind": "info",
+    "description": "version"
+  },
+  "goto": {
+    "kind": "query",
+    "description": "goto"
+  },
+  "join": {
+    "kind": "query",
+    "description": "join"
+  },
+  "locate": {
+    "kind": "query",
+    "description": "locate"
+  },
+  "userid": {
+    "kind": "query",
+    "description": "userid"
+  },
+  "username": {
+    "kind": "query",
+    "description": "username"
+  },
+  "displayname": {
+    "kind": "query",
+    "description": "displayname"
+  },
+  "distance": {
+    "kind": "query",
+    "description": "distance"
+  },
+  "position": {
+    "kind": "query",
+    "description": "position"
+  },
+  "health": {
+    "kind": "query",
+    "description": "health"
+  },
+  "speed": {
+    "kind": "query",
+    "description": "speed"
+  },
+  "jumpstats": {
+    "kind": "query",
+    "description": "jumpstats"
+  },
+  "state": {
+    "kind": "query",
+    "description": "state"
+  },
+  "tools": {
+    "kind": "query",
+    "description": "tools"
+  },
+  "rig": {
+    "kind": "query",
+    "description": "rig"
+  },
+  "team": {
+    "kind": "query",
+    "description": "team"
+  },
+  "age": {
+    "kind": "query",
+    "description": "age"
+  },
+  "savepos": {
+    "kind": "bookmark",
+    "description": "savepos"
+  },
+  "loadpos": {
+    "kind": "bookmark",
+    "description": "loadpos"
+  },
+  "delpos": {
+    "kind": "bookmark",
+    "description": "delpos"
+  },
+  "listpos": {
+    "kind": "bookmark",
+    "description": "listpos"
+  },
+  "clearpos": {
+    "kind": "bookmark",
+    "description": "clearpos"
+  },
+  "back": {
+    "kind": "bookmark",
+    "description": "back"
+  },
+  "refresh": {
+    "kind": "control",
+    "description": "refresh"
+  },
+  "reconnect": {
+    "kind": "control",
+    "description": "reconnect"
+  },
+  "stop": {
+    "kind": "control",
+    "description": "stop"
+  },
+  "pause": {
+    "kind": "control",
+    "description": "pause"
+  },
+  "resume": {
+    "kind": "control",
+    "description": "resume"
+  },
+  "fling": {
+    "kind": "action",
+    "description": "fling"
+  }
+}

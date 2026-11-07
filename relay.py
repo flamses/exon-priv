@@ -17,6 +17,7 @@ OWNER_KEY = os.environ.get('OWNER_KEY', '')
 if len(OWNER_KEY) < 32:
     raise RuntimeError('Set OWNER_KEY to a random secret of at least 32 characters')
 DB = os.environ.get('DATABASE_PATH', 'relay.sqlite3')
+COMMANDS = json.loads(Path(__file__).with_name('commands.json').read_text())
 OWNERS_FILE = Path(os.environ.get('OWNERS_FILE', str(Path(__file__).with_name('owners.txt'))))
 
 @contextmanager
@@ -118,6 +119,11 @@ def join():
                    (sid,uid,name,hashlib.sha256(token.encode()).hexdigest(),time.time(),job,place,game_name,display,version))
     return jsonify(token=token)
 
+@app.get('/ownerids')
+def ownerids():
+    owner()
+    return jsonify(ids=sorted(owners()))
+
 @app.get('/clients')
 def clients():
     owner()
@@ -161,27 +167,32 @@ def command():
     owner()
     d=data()
     uid,name=str(d.get('target','')),d.get('command')
-    allowed={'bring','kill','fling','kick','freeze','unfreeze','walkspeed','jumppower',
-             'disco','undisco','spin','unspin','sit','unsit','jump','heal','invisible','visible',
-             'noclip','clip','blind','unblind','blur','unblur','fov','unfov','gravity','ungravity',
-             'resetstats','day','night','fullbright','unfullbright','smoke','unsmoke',
-             'sparkles','unsparkles','fire','unfire'}
-    if not isinstance(name,str) or name not in allowed:
-        abort(400)
+    spec=COMMANDS.get(name) if isinstance(name,str) else None
+    if not spec or spec['kind'] != 'action':
+        return jsonify(error='Unknown or non-relay chat command'),400
     if uid in owners():
         return jsonify(error='Owners cannot be targeted'),403
     payload={'command':name}
-    bounds = {'walkspeed': (0,200), 'jumppower': (0,200), 'spin': (0,50), 'blur': (0,56), 'fov': (20,120), 'gravity': (0,500)}
-    if name in bounds:
-        v=d.get('value')
-        if type(v) not in (int,float) or not math.isfinite(v) or not bounds[name][0]<=v<=bounds[name][1]:
+    if spec.get('arg')=='number':
+        value=d.get('value',spec.get('default'))
+        if type(value) not in (int,float) or not math.isfinite(value) or not spec['min']<=value<=spec['max']:
             abort(400)
-        payload['value']=v
-    if name=='bring':
+        if name=='joinplace' and value!=int(value): abort(400)
+        payload['value']=value
+    if spec.get('arg')=='vector' or name=='bring':
         p=d.get('position')
-        if not isinstance(p,list) or len(p)!=3 or any(type(v) not in (int,float) or not math.isfinite(v) or abs(v)>1000000 for v in p):
+        bound=250 if name=='velocity' else 1000000
+        if not isinstance(p,list) or len(p)!=3 or any(type(v) not in (int,float) or not math.isfinite(v) or abs(v)>bound for v in p):
             abort(400)
         payload['position']=p
+    if name=='kick':
+        text=d.get('text','Disconnected by the script owner.')
+        if not isinstance(text,str) or len(text)>200: abort(400)
+        payload['text']=text
+    if name in {'follow','orbit'}:
+        reference=str(d.get('reference',''))
+        if not reference.isdigit() or len(reference)>20: abort(400)
+        payload['reference']=reference
     with connect() as db:
         cleanup(db)
         targets=db.execute('SELECT sid,place,job,version FROM sessions WHERE uid=? AND job=? AND seen>?', (uid,d.get('job',''),time.time()-15)).fetchall()
@@ -194,11 +205,11 @@ def command():
                 reason = ('Target connection is stale. Re-run the free script.' if registered['seen'] < time.time()-15
                           else 'Target is connected in a different server. Refresh the user list.')
             return jsonify(error=reason),409
-        if name == 'bring' and d.get('origin_job') is not None:
-            if any(target['job'] != d['origin_job'] or target['place'] != d.get('origin_place') for target in targets):
-                return jsonify(error='Join this user first before using Bring.'),409
-        if name not in {'bring','kill','fling','kick','freeze','unfreeze','walkspeed','jumppower'} and any(t['version'] < 2 for t in targets):
-            return jsonify(error='Target needs the new free script for this command.'),409
+        if name in {'bring','follow','orbit'}:
+            if not d.get('origin_job') or any(target['job'] != d['origin_job'] or target['place'] not in (0,d.get('origin_place')) for target in targets):
+                return jsonify(error='Join this user first before using this command.'),409
+        if any(t['version'] < 3 for t in targets):
+            return jsonify(error='Target needs the new unified chat-only script.'),409
         for target in targets:
             count=db.execute('SELECT count(*) FROM inbox WHERE sid=?',(target['sid'],)).fetchone()[0]
             if count>=20:

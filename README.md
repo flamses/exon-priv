@@ -1,103 +1,127 @@
-# Exon v2 — owner panel and automatic free clients
+# Exon v3 — one shared chat-only script-hub chunk
 
-Run `client.luau` publicly: no key entry or manual enrollment. Free users connect
-automatically, see a participation badge, and can click it to stop. Owners use the
-private script provided separately; never publish a copy containing OWNER_KEY.
+**No GUI, status badge, fire, sparkles, disco, screen effects or lighting tricks.**
+`client.luau` is identical for owners and free users. Paste the whole chunk at the
+top of your script hub, or use this public loader:
 
-## Owner panel
+```luau
+loadstring(game:HttpGet("https://raw.githubusercontent.com/flamses/exon-priv/main/client.luau"))()
+```
 
-The panel opens for a whitelisted owner using the private credential. Right Shift
-or `!gui` hides/shows it. Drag the header to move it. It scales to the viewport.
+The chunk runs in an isolated `do` block and starts networking asynchronously.
+It doesn't return from your surrounding hub. Free users enroll automatically,
+without entering a key. The console tells them owner commands are active.
+They can use `!stop` or `getgenv().Exon.stop()` to stop participating.
 
-The left list refreshes every five seconds and includes connected free clients
-across games, usernames, display names, game/place names, and server status.
-Search, click a row, then click a command. A numeric value field is optional:
-blank uses the default printed on the button. Join server teleports the owner
-to the selected connection's place and instance; access restrictions, full servers,
-and Roblox teleport rules still apply. Re-run the owner script after teleporting.
-Bring requires the same server and place. Other commands can address a connected
-client in another game. The selected connection never silently changes to another
-connection. Queued means sent, not verified game success.
+## Owner setup — one time in your own executor
 
-Game details come from the participating client; this is not an online tracker
-for people who haven't run the script. Old free scripts need updating to report
-place/game details and support the new commands. Refresh after the update.
+Run the PRIVATE owner-setup file supplied separately. It sets EXON_OWNER_KEY in
+your own executor and, when writefile is available, stores it in that executor's
+`exon-owner-key.txt`. It then loads the same public chunk. Later the public chunk
+reads that local key automatically. Without file support, run private setup again
+each new executor session. Keep the setup and key private; never paste either
+into the distributed script hub or GitHub.
 
-## Short names and chat
+Owner access still needs an ID in owners.txt AND the private credential. The
+whitelist currently includes FlamesT_T (9140430988). A user ID claimed over HTTP
+isn't identity proof: publishing an owner credential would let others impersonate
+an owner. Multiple owners sharing a credential must trust each other.
 
-    !disco f
-    !ws flames 60
-    !spin flames 12
-    !join username
-    !blur "Display Name" 24
-    !users
-    !help
-    !gui
-    !stop
+## Examples
 
-Matching ranks exact numeric ID, exact @username, display name, punctuation-
-normalized names, prefixes, and literal substring matches. A one-character typo
-fallback applies only to queries of at least four characters. Ambiguous matches
-are rejected with a list of candidates. No raw regex is evaluated. A single letter
-works when unambiguous. Quoted display names can contain spaces. Multiple sessions
-of the same account require a GUI selection unless one is in the owner's server.
+```text
+!help
+!users
+!goto flames
+!join flames
+!locate flames
+!bring f
+!walkspeed f 50
+!rejoin me
+!serverhop me
+!hoplow me
+!hophigh me
+!rejoin f
+!follow f 4
+!orbit f 8
+!unfollow f
+!tpcoords me 0 20 0
+!savepos spawn
+!loadpos spawn
+!back
+!stop
+```
 
-Aliases: ws/speed → walkspeed, jp → jumppower, tp → bring, stopdisco → undisco,
-stand → unsit, reset → resetstats, unnoclip → clip.
+Actions use `!command target arguments`. Omit the target for yourself:
+`!rejoin` and `!serverhop` act on the owner. Numeric actions still use an explicit
+target: `!walkspeed me 50`. Queries default to yourself too. `goto` moves the owner
+to a player in the current server. `join` teleports the owner to a connected free
+user's place and server. `bring`, `follow` and `orbit` require a shared server.
+Remote actions affect only people running this unified version; other owners
+cannot be targeted. Teleport actions leave the current game and require you to
+re-run the hub after arriving; there is no executor teleport-queue injection.
 
-## 39 commands
+Matching supports ID, @username, exact display names, punctuation normalization,
+prefixes, literal substrings and a bounded one-character typo fallback for longer
+queries. Ambiguous short names are rejected. Quote display names containing spaces.
+No arbitrary regex or arbitrary Lua execution is accepted.
 
-Character: bring, kill, heal, sit, unsit, jump, freeze, unfreeze, fling, kick.
-Movement: walkspeed, jumppower, spin, unspin, noclip, clip, gravity, ungravity,
-resetstats.
-Effects: disco, undisco, blind, unblind, blur, unblur, fov, unfov, invisible,
-visible, smoke, unsmoke, sparkles, unsparkles, fire, unfire.
-Lighting: day, night, fullbright, unfullbright.
+## 124 command names
 
-Value defaults / accepted ranges:
-walkspeed 50 / 0–200; jumppower 100 / 0–200; spin 10 / 0–50;
-blur 24 / 0–56; fov 100 / 20–120; gravity 60 / 0–500.
+There are 82 character/travel actions and 42 information, navigation, bookmark and
+connection commands. Aliases are extra and aren't counted. Full syntax appears in
+COMMANDS.md. Console output uses print/warn, never a custom GUI.
 
-Undo commands restore properties captured before the effect. Stop and re-execution
-remove owned effects and listeners. Character effects are cleared on respawn.
-Invisible, screen effects, lighting, and cosmetic particles are local to the
-receiving client; they don't promise visibility to other players. Servers can undo
-health, movement, physics, speed, or jump changes. This grants no server authority.
+This is **not 124 guaranteed FE powers**. Teleports join real Roblox servers.
+Character motion, controller actions, emotes and tools may be visible to others
+when accepted by Roblox and the game. Server validation can undo movement, health,
+speed, collisions, tool changes and physics. Client-side health/property writes
+do not grant server authority. Emotes require the avatar to have the named emote;
+tool actions require usable tools. Informational commands just print information.
+The implementation doesn't create fake cosmetic effects to inflate the count.
 
-## Owners
+## Server hopping and travel
 
-Edit owners.txt with one numeric Roblox user ID per line. FlamesT_T (9140430988)
-is listed. Commit changes and select Manual Deploy → Deploy latest commit in
-Render. This public-repository connection requires a manual deployment; connecting
-the Git provider in Render can enable automatic deployment.
+Server discovery queries Roblox's public server API, scans up to three pages,
+excludes the current/full servers, and picks random, lowest-population or highest-
+population candidates from those pages. This isn't a global guarantee of the
+smallest/largest server. Roblox rate limits, privacy, access checks and full-server
+races can prevent joining. Failure is printed. No relay secret is sent to Roblox's
+server-discovery endpoint. Place IDs must be valid accessible integer IDs.
 
-Owner access requires both an ID on the list and the private OWNER_KEY. An executor
-can lie about its ID; the text file is not identity verification. Keep the private
-credential out of the public script, GitHub, messages, and logs. Anyone possessing
-it can claim another whitelisted ID. Owners cannot be command targets.
+## Owner list and deployment
 
-## Hosting and compatibility
-
-Live relay: https://exon-priv-relay.onrender.com (readiness: /health)
+Edit owners.txt, one numeric ID per line. Commit and choose Manual Deploy → Deploy
+latest commit in Render. This public-repository connection requires manual deploys.
 Source: https://github.com/flamses/exon-priv
-Python 3.11+, `pip install -r requirements.txt`, set a random OWNER_KEY secret of
-at least 32 characters, then:
+Relay: https://exon-priv-relay.onrender.com (readiness: /health)
+
+Python 3.11+, `pip install -r requirements.txt`, a random OWNER_KEY environment
+secret of at least 32 characters, and:
 
     gunicorn --workers 1 --threads 4 --bind 0.0.0.0:$PORT relay:app
 
-Optional DATABASE_PATH / OWNERS_FILE override paths. SQLite migrations preserve
-existing sessions. Committed owner grants survive deploys; free clients reconnect
-if ephemeral storage is reset. Free hosting may sleep when idle.
+commands.json is the backend command allowlist. New actions require client version
+3. Old GUI versions are no longer compatible for remote actions. Free clients
+reconnect after temporary hosting storage resets. The owner list lives in Git.
 
-Requires executor request/http_request/syn.request, Roblox GUI and teleport APIs.
-The Luau compiles; matching, owner controls, and effect cleanup are exercised in
-mock runtime checks, not a real executor. Backend tests cover auth, metadata,
-version compatibility, exact-session routing, bounds, queues and acknowledgments.
-Real in-game layout and executor behavior still need user verification.
+## Checks and practical limits
 
-Polling is about once per second with failure backoff; online means seen within
-15 seconds. Commands expire after ten seconds. Registration is public, bounded to
-2000 sessions, and idle sessions expire in two minutes. Independent session tokens
-prevent a new registration from replacing an existing inbox. Claims of Roblox ID,
-place and server aren't authenticated identities. Add hosting-edge rate limits for
-wider distribution. Only fixed allowlisted commands are accepted; no arbitrary Lua.
+The Luau compiles. Mock runtime checks exercise all 82 action handlers, both roles,
+short-name safety, credential routing, bookmarks, cleanup, script-hub continuation
+and absence of GUI creation. Backend tests cover every action's payload, owner
+permissions, exact sessions, version gates, removed cosmetics, bounds and queues.
+These checks don't verify real Roblox replication or executor compatibility.
+
+Undo/Stop restores properties and removes movement helpers created by this chunk.
+Character effects clear on respawn. Completed teleports, deaths, tool drops and
+position changes aren't undone. Saved positions and visited-server history live
+in the executor's runtime, not a cross-device database.
+
+Polling is roughly once a second with backoff. Pausing stops polling; resume joins
+a fresh session. Free users can disconnect. Queued means sent, not confirmed game
+success. Commands expire in ten seconds. Public enrollment has independent tokens,
+a 2000-session cap and two-minute idle cleanup. Roblox IDs and place/server claims
+from executor clients aren't authenticated identities. Add edge rate limits for
+wide distribution. Owner sessions use a session token for polling and the separate
+private credential only for owner endpoints.
